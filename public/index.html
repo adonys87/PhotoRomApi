@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remover Fundo - PhotoRoom API</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f5f5f7; color: #1d1d1f; line-height: 1.5;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 720px; margin: 0 auto; background: #ffffff;
+            border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            padding: 32px;
+        }
+        h1 { font-size: 24px; font-weight: 600; margin-bottom: 8px; color: #1d1d1f; }
+        p.subtitle { color: #86868b; font-size: 14px; margin-bottom: 28px; }
+        .form-group { margin-bottom: 20px; }
+        label {
+            display: block; font-size: 13px; font-weight: 600;
+            color: #1d1d1f; margin-bottom: 8px;
+        }
+        input[type="text"] {
+            width: 100%; padding: 12px 14px; font-size: 14px;
+            border: 1px solid #d2d2d7; border-radius: 8px; outline: none;
+        }
+        input[type="text"]:focus { border-color: #007aff; }
+        .select-group { display: flex; gap: 16px; flex-wrap: wrap; }
+        .select-group .form-group { flex: 1; min-width: 140px; }
+        select {
+            width: 100%; padding: 12px 14px; font-size: 14px;
+            border: 1px solid #d2d2d7; border-radius: 8px;
+            background: #fff; outline: none; cursor: pointer;
+        }
+        select:focus { border-color: #007aff; }
+        .btn-group { display: flex; gap: 12px; margin-bottom: 28px; }
+        button {
+            flex: 1; padding: 12px 18px; font-size: 14px;
+            font-weight: 600; border: none; border-radius: 8px;
+            cursor: pointer; transition: background 0.2s, opacity 0.2s;
+        }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-selecionar { background: #f5f5f7; color: #1d1d1f; border: 1px solid #d2d2d7; }
+        .btn-selecionar:hover:not(:disabled) { background: #e5e5ea; }
+        .btn-iniciar { background: #007aff; color: #ffffff; }
+        .btn-iniciar:hover:not(:disabled) { background: #0062cc; }
+        .btn-iniciar.processando { background: #86868b; }
+
+        .progresso { display: none; margin-top: 24px; }
+        .progresso-header {
+            display: flex; justify-content: space-between;
+            margin-bottom: 10px; font-size: 13px; font-weight: 600; color: #1d1d1f;
+        }
+        .progresso-bar {
+            height: 8px; background: #e5e5ea; border-radius: 4px;
+            overflow: hidden; margin-bottom: 16px;
+        }
+        .progresso-fill {
+            height: 100%; background: #007aff; width: 0%; transition: width 0.3s;
+        }
+        .progresso-lista {
+            max-height: 300px; overflow-y: auto; border: 1px solid #e5e5ea;
+            border-radius: 8px; background: #fafafa;
+        }
+        .item-progresso {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 12px; border-bottom: 1px solid #e5e5ea; font-size: 13px;
+        }
+        .item-progresso:last-child { border-bottom: none; }
+        .item-nome { flex: 1; color: #1d1d1f; }
+        .item-status { font-weight: 600; white-space: nowrap; }
+        .status-sucesso { color: #34c759; }
+        .status-erro { color: #ff3b30; }
+        .status-processando { color: #007aff; animation: pulse 1.5s infinite; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; } 50% { opacity: 0.6; }
+        }
+        .resultado {
+            margin-top: 16px; padding: 12px 16px; border-radius: 8px;
+            font-size: 13px; display: none;
+        }
+        .resultado.sucesso { background: #e6f7ea; color: #1e7e34; border: 1px solid #a3d9a5; }
+        .resultado.erro { background: #fdecea; color: #c00000; border: 1px solid #f5a6a6; }
+        .resultado.info { background: #e8f4fd; color: #0066cc; border: 1px solid #a3d1f5; }
+        .nota {
+            margin-top: 28px; padding-top: 16px; border-top: 1px solid #e5e5ea;
+            font-size: 12px; color: #86868b;
+        }
+        .nota b { color: #1d1d1f; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Remover Fundo de Imagens</h1>
+    <p class="subtitle">Selecione uma pasta no Mac, escolha as opções e processe todas as imagens de uma vez.</p>
+
+    <div class="form-group">
+        <label for="imagePath">Caminho da pasta (Image Path)</label>
+        <div style="display: flex; gap: 8px;">
+            <input type="text" id="imagePath" placeholder="/Users/joanadonys/Downloads/minhas-fotos" readonly>
+            <button type="button" class="btn-selecionar" id="btnSelecionar">📁 Selecionar Pasta</button>
+        </div>
+    </div>
+
+    <div class="select-group">
+        <div class="form-group">
+            <label for="format">Formato de saída</label>
+            <select id="format">
+                <option value="jpg">JPG</option>
+                <option value="png">PNG</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="bgColor">Cor de fundo</label>
+            <select id="bgColor">
+                <option value="branco">Branco</option>
+                <option value="preto">Preto</option>
+                <option value="nenhuma">Nenhuma (transparente)</option>
+            </select>
+        </div>
+    </div>
+    <div class="btn-group">
+        <button type="button" id="btnIniciar" class="btn-iniciar" disabled>▶ Iniciar Processamento</button>
+    </div>
+
+    <div id="resultado" class="resultado"></div>
+
+    <div id="progresso" class="progresso">
+        <div class="progresso-header">
+            <span id="progressoTexto">Processando imagens...</span>
+            <span id="contador">0 / 0</span>
+        </div>
+        <div class="progresso-bar">
+            <div id="progressoFill" class="progresso-fill"></div>
+        </div>
+        <div class="progresso-lista" id="listaProgresso"></div>
+    </div>
+
+    <div class="nota">
+        <b>Como funciona:</b> as imagens editadas são salvas na <b>mesma pasta</b> das originais, com o nome:<br>
+        <code>nomeoriginal_Editada_ddmmyyyy_hhMMss.ext</code><br>
+        Exemplo: <code>imagem_editada_28102026_200001.jpg</code>
+    </div>
+</div>
+
+<script>
+    const imagePathInput = document.getElementById('imagePath');
+    const btnSelecionar = document.getElementById('btnSelecionar');
+    const btnIniciar = document.getElementById('btnIniciar');
+    const formatSelect = document.getElementById('format');
+    const bgColorSelect = document.getElementById('bgColor');
+    const progressoDiv = document.getElementById('progresso');
+    const listaProgresso = document.getElementById('listaProgresso');
+    const progressoFill = document.getElementById('progressoFill');
+    const progressoTexto = document.getElementById('progressoTexto');
+    const contador = document.getElementById('contador');
+    const resultadoDiv = document.getElementById('resultado');
+
+    let eventSource = null;
+    let jobIdAtual = null;
+
+    function atualizarEstadoIniciar() {
+        const temCaminho = imagePathInput.value.trim().length > 0;
+        btnIniciar.disabled = !temCaminho;
+    }
+
+    imagePathInput.addEventListener('input', atualizarEstadoIniciar);
+
+
+    btnSelecionar.addEventListener('click', async () => {
+        btnSelecionar.disabled = true;
+        btnSelecionar.textContent = 'Abrindo...';
+        try {
+            const resposta = await fetch('/selecionar-pasta', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            if (!resposta.ok) {
+                throw new Error('Não foi possível abrir o seletor de pasta.');
+            }
+            const dados = await resposta.json();
+            if (dados.erro) {
+                alert(dados.erro);
+                return;
+            }
+            imagePathInput.value = dados.caminho;
+            atualizarEstadoIniciar();
+        } catch (erro) {
+            alert('Erro ao selecionar pasta: ' + erro.message);
+        } finally {
+            btnSelecionar.disabled = false;
+            btnSelecionar.textContent = '📁 Selecionar Pasta';
+        }
+    });
+
+    btnIniciar.addEventListener('click', async () => {
+        const imagePath = imagePathInput.value.trim();
+        const format = formatSelect.value;
+        const bgColor = bgColorSelect.value;
+        try {
+            const resposta = await fetch('/processar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imagePath, format, bgColor })
+            });
+            if (!resposta.ok) {
+                const erro = await resposta.json();
+                throw new Error(erro.erro || 'Erro ao iniciar processamento.');
+            }
+            const dados = await resposta.json();
+            jobIdAtual = dados.jobId;
+            btnIniciar.disabled = true;
+            btnIniciar.classList.add('processando');
+            btnIniciar.textContent = 'Processando...';
+            btnSelecionar.disabled = true;
+            formatSelect.disabled = true;
+            bgColorSelect.disabled = true;
+            progressoDiv.style.display = 'block';
+            listaProgresso.innerHTML = '';
+            resultadoDiv.style.display = 'none';
+            if (eventSource) { eventSource.close(); }
+            eventSource = new EventSource('/progresso/' + jobIdAtual);
+            eventSource.onmessage = (event) => {
+                const job = JSON.parse(event.data);
+                renderizarProgresso(job);
+                if (job.status === 'concluido' || job.status === 'erro') {
+                    finalizarProcessamento(job);
+                }
+            };
+            eventSource.onerror = () => { eventSource.close(); };
+        } catch (erro) {
+            alert(erro.message);
+            btnIniciar.disabled = false;
+            btnIniciar.classList.remove('processando');
+            btnIniciar.textContent = '▶ Iniciar Processamento';
+            btnSelecionar.disabled = false;
+            formatSelect.disabled = false;
+            bgColorSelect.disabled = false;
+        }
+    });
+
+    function renderizarProgresso(job) {
+        const percentual = job.total > 0 ? Math.round((job.processados / job.total) * 100) : 0;
+        progressoFill.style.width = percentual + '%';
+        progressoTexto.textContent = job.status === 'concluido' ? 'Concluído!' : 'Processando imagens...';
+        contador.textContent = job.processados + ' / ' + job.total;
+        if (job.detalhes.length > 0) {
+            const exibir = job.detalhes.slice(-15);
+            listaProgresso.innerHTML = exibir.map(function(item) {
+                var classe = item.status === 'sucesso' ? 'status-sucesso' :
+                             item.status === 'erro' ? 'status-erro' : 'status-processando';
+                var icone = item.status === 'sucesso' ? '✅' :
+                            item.status === 'erro' ? '❌' : '⏳';
+                var infoExtra = item.status === 'erro' ? ' - ' + item.mensagem :
+                                item.status === 'sucesso' ? ' → ' + item.saida : '';
+                var statusTexto = item.status === 'sucesso' ? 'Concluído' :
+                                  item.status === 'erro' ? 'Erro' : 'Processando';
+                return '<div class="item-progresso">' +
+                    '<div class="item-nome">' + icone + ' ' + item.arquivo + '</div>' +
+                    '<div class="item-status ' + classe + '">' + statusTexto + infoExtra + '</div>' +
+                    '</div>';
+            }).join('');
+        }
+        listaProgresso.scrollTop = listaProgresso.scrollHeight;
+    }
+
+    function finalizarProcessamento(job) {
+        if (eventSource) { eventSource.close(); eventSource = null; }
+        btnIniciar.disabled = false;
+        btnIniciar.classList.remove('processando');
+        btnIniciar.textContent = '▶ Iniciar Processamento';
+        btnSelecionar.disabled = false;
+        formatSelect.disabled = false;
+        bgColorSelect.disabled = false;
+        resultadoDiv.style.display = 'block';
+        if (job.status === 'concluido') {
+            resultadoDiv.className = 'resultado sucesso';
+            resultadoDiv.innerHTML =
+                '<strong>Processamento concluído!</strong><br>' +
+                'Sucessos: <strong>' + job.sucessos + '</strong> | ' +
+                'Erros: <strong>' + job.erros + '</strong> | ' +
+                'Total: <strong>' + job.total + '</strong><br>' +
+                'As imagens foram salvas na pasta selecionada.';
+        } else {
+            resultadoDiv.className = 'resultado erro';
+            resultadoDiv.innerHTML =
+                '<strong>Ocorreu um erro durante o processamento:</strong><br>' +
+                (job.erro || 'Erro desconhecido');
+        }
+    }
+
+</script>
+
+</body>
+</html>
+
