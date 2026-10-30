@@ -2,6 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const { reduzirMaiorProporcao } = require('./redimensionar');
 
 const app = express();
 const PORT = 3000;
@@ -54,10 +55,25 @@ app.post('/selecionar-pasta', (req, res) => {
         return res.json({ caminho: caminho });
     });
 });
+function parseValorBase(valorBase) {
+    if (valorBase === undefined || valorBase === null || valorBase === '') {
+        return null;
+    }
+    const n = Number(valorBase);
+    if (!Number.isInteger(n) || n < 1) {
+        return false;
+    }
+    return n;
+}
+
 app.post('/processar', async (req, res) => {
-    const { imagePath, format, bgColor } = req.body;
+    const { imagePath, format, bgColor, valorBase } = req.body;
     if (!imagePath || !format || !bgColor) {
         return res.status(400).json({ erro: 'Parâmetros obrigatórios: imagePath, format, bgColor' });
+    }
+    const valorBaseParsed = parseValorBase(valorBase);
+    if (valorBaseParsed === false) {
+        return res.status(400).json({ erro: 'Valor Base para Redimensionar deve ser um inteiro positivo.' });
     }
     if (!fs.existsSync(imagePath)) {
         return res.status(400).json({ erro: 'O caminho informado não existe.' });
@@ -68,7 +84,7 @@ app.post('/processar', async (req, res) => {
         sucessos: 0, erros: 0, detalhes: [], criadoEm: new Date()
     };
     jobs.set(jobId, job);
-    processarImagens(jobId, imagePath, format, bgColor).catch(console.error);
+    processarImagens(jobId, imagePath, format, bgColor, valorBaseParsed).catch(console.error);
     return res.json({ jobId });
 });
 
@@ -128,7 +144,7 @@ function encontrarImagensRecursivo(dir, baseDir = dir) {
     return resultados;
 }
 
-async function processarImagens(jobId, imagePath, format, bgColor) {
+async function processarImagens(jobId, imagePath, format, bgColor, valorBase) {
     const job = jobs.get(jobId);
     const photoRoomApi = process.env.PHOTOROOM_API_KEY;
     if (!photoRoomApi) {
@@ -182,11 +198,24 @@ async function processarImagens(jobId, imagePath, format, bgColor) {
                 throw new Error('Erro na API: ' + resposta.status);
             }
             const arrayBuffer = await resposta.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
+            let buffer = Buffer.from(arrayBuffer);
+            let aviso = null;
+            let dimensoes = null;
+            if (valorBase) {
+                const resultado = await reduzirMaiorProporcao(buffer, valorBase);
+                buffer = resultado.buffer;
+                aviso = resultado.aviso;
+                dimensoes = resultado.width + 'x' + resultado.height;
+            }
             fs.writeFileSync(caminhoSaida, buffer);
             job.sucessos++;
-            // Mostra o caminho relativo para o usuário saber onde está
-            job.detalhes.push({ arquivo: img.caminhoRelativo, status: 'sucesso', saida: nomeSaida });
+            job.detalhes.push({
+                arquivo: img.caminhoRelativo,
+                status: 'sucesso',
+                saida: nomeSaida,
+                aviso,
+                dimensoes
+            });
         } catch (erro) {
             job.erros++;
             job.detalhes.push({ arquivo: img.caminhoRelativo, status: 'erro', mensagem: erro.message });

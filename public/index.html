@@ -23,11 +23,14 @@
             display: block; font-size: 13px; font-weight: 600;
             color: #1d1d1f; margin-bottom: 8px;
         }
-        input[type="text"] {
+        input[type="text"],
+        input[type="number"] {
             width: 100%; padding: 12px 14px; font-size: 14px;
             border: 1px solid #d2d2d7; border-radius: 8px; outline: none;
         }
-        input[type="text"]:focus { border-color: #007aff; }
+        input[type="text"]:focus,
+        input[type="number"]:focus { border-color: #007aff; }
+        .hint { font-size: 12px; font-weight: 400; color: #86868b; margin-top: 6px; }
         .select-group { display: flex; gap: 16px; flex-wrap: wrap; }
         .select-group .form-group { flex: 1; min-width: 140px; }
         select {
@@ -73,6 +76,7 @@
         .item-nome { flex: 1; color: #1d1d1f; }
         .item-status { font-weight: 600; white-space: nowrap; }
         .status-sucesso { color: #34c759; }
+        .status-aviso { color: #d08a00; }
         .status-erro { color: #ff3b30; }
         .status-processando { color: #007aff; animation: pulse 1.5s infinite; }
         @keyframes pulse {
@@ -124,6 +128,12 @@
             </select>
         </div>
     </div>
+
+    <div class="form-group">
+        <label for="valorBase">Valor Base para Redimensionar</label>
+        <input type="number" id="valorBase" min="1" step="1" placeholder="1200">
+        <p class="hint">Opcional. Inteiro: o lado maior da imagem vira esse valor, mantendo a proporção. Se vazio, mantém o tamanho da PhotoRoom. Se as duas dimensões já forem menores, não redimensiona.</p>
+    </div>
     <div class="btn-group">
         <button type="button" id="btnIniciar" class="btn-iniciar" disabled>▶ Iniciar Processamento</button>
     </div>
@@ -144,7 +154,8 @@
     <div class="nota">
         <b>Como funciona:</b> as imagens editadas são salvas na <b>mesma pasta</b> das originais, com o nome:<br>
         <code>nomeoriginal_Editada_ddmmyyyy_hhMMss.ext</code><br>
-        Exemplo: <code>imagem_editada_28102026_200001.jpg</code>
+        Exemplo: <code>imagem_editada_28102026_200001.jpg</code><br>
+        Se preencher o valor base, o lado maior da imagem sem fundo é ajustado para esse tamanho.
     </div>
 </div>
 
@@ -154,6 +165,7 @@
     const btnIniciar = document.getElementById('btnIniciar');
     const formatSelect = document.getElementById('format');
     const bgColorSelect = document.getElementById('bgColor');
+    const valorBaseInput = document.getElementById('valorBase');
     const progressoDiv = document.getElementById('progresso');
     const listaProgresso = document.getElementById('listaProgresso');
     const progressoFill = document.getElementById('progressoFill');
@@ -202,11 +214,21 @@
         const imagePath = imagePathInput.value.trim();
         const format = formatSelect.value;
         const bgColor = bgColorSelect.value;
+        const valorBaseRaw = valorBaseInput.value.trim();
+        let valorBase = null;
+        if (valorBaseRaw !== '') {
+            const n = Number(valorBaseRaw);
+            if (!Number.isInteger(n) || n < 1) {
+                alert('Valor Base para Redimensionar deve ser um inteiro positivo.');
+                return;
+            }
+            valorBase = n;
+        }
         try {
             const resposta = await fetch('/processar', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ imagePath, format, bgColor })
+                body: JSON.stringify({ imagePath, format, bgColor, valorBase })
             });
             if (!resposta.ok) {
                 const erro = await resposta.json();
@@ -220,6 +242,7 @@
             btnSelecionar.disabled = true;
             formatSelect.disabled = true;
             bgColorSelect.disabled = true;
+            valorBaseInput.disabled = true;
             progressoDiv.style.display = 'block';
             listaProgresso.innerHTML = '';
             resultadoDiv.style.display = 'none';
@@ -241,6 +264,7 @@
             btnSelecionar.disabled = false;
             formatSelect.disabled = false;
             bgColorSelect.disabled = false;
+            valorBaseInput.disabled = false;
         }
     });
 
@@ -252,14 +276,23 @@
         if (job.detalhes.length > 0) {
             const exibir = job.detalhes.slice(-15);
             listaProgresso.innerHTML = exibir.map(function(item) {
-                var classe = item.status === 'sucesso' ? 'status-sucesso' :
-                             item.status === 'erro' ? 'status-erro' : 'status-processando';
-                var icone = item.status === 'sucesso' ? '✅' :
-                            item.status === 'erro' ? '❌' : '⏳';
-                var infoExtra = item.status === 'erro' ? ' - ' + item.mensagem :
-                                item.status === 'sucesso' ? ' → ' + item.saida : '';
-                var statusTexto = item.status === 'sucesso' ? 'Concluído' :
-                                  item.status === 'erro' ? 'Erro' : 'Processando';
+                var classe = item.status === 'erro' ? 'status-erro' :
+                             item.aviso ? 'status-aviso' :
+                             item.status === 'sucesso' ? 'status-sucesso' : 'status-processando';
+                var icone = item.status === 'erro' ? '❌' :
+                            item.aviso ? '⚠️' :
+                            item.status === 'sucesso' ? '✅' : '⏳';
+                var infoExtra = '';
+                if (item.status === 'erro') {
+                    infoExtra = ' - ' + item.mensagem;
+                } else if (item.status === 'sucesso') {
+                    infoExtra = ' → ' + item.saida;
+                    if (item.dimensoes) infoExtra += ' (' + item.dimensoes + ')';
+                    if (item.aviso) infoExtra += ' — ' + item.aviso;
+                }
+                var statusTexto = item.status === 'erro' ? 'Erro' :
+                                  item.aviso ? 'Aviso' :
+                                  item.status === 'sucesso' ? 'Concluído' : 'Processando';
                 return '<div class="item-progresso">' +
                     '<div class="item-nome">' + icone + ' ' + item.arquivo + '</div>' +
                     '<div class="item-status ' + classe + '">' + statusTexto + infoExtra + '</div>' +
@@ -277,6 +310,7 @@
         btnSelecionar.disabled = false;
         formatSelect.disabled = false;
         bgColorSelect.disabled = false;
+        valorBaseInput.disabled = false;
         resultadoDiv.style.display = 'block';
         if (job.status === 'concluido') {
             resultadoDiv.className = 'resultado sucesso';

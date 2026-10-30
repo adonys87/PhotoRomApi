@@ -6,6 +6,7 @@ Ferramenta local para **remover o fundo de várias imagens de uma vez** usando a
 
 - Percorre a pasta selecionada **recursivamente**
 - Envia cada imagem para a API de segmentação do PhotoRoom (`/v1/segment`)
+- Opcionalmente **redimensiona** o resultado com um valor base (inteiro)
 - Salva o resultado **na mesma pasta do arquivo original**
 - Mostra progresso em tempo real no navegador (sucessos e erros)
 
@@ -69,7 +70,8 @@ Abra [http://localhost:3000](http://localhost:3000).
    - Branco
    - Preto
    - Nenhuma (transparente; o formato passa a PNG)
-4. Clique em **Iniciar Processamento** e acompanhe a lista.
+4. (Opcional) Preencha **Valor Base para Redimensionar** com um inteiro. O lado maior da imagem sem fundo vira esse valor e o outro escala na proporção (`2400x1200` + `1200` → `1200x600`). Campo vazio mantém o tamanho que a PhotoRoom devolve. Se largura e altura já forem menores que o valor, a imagem **não é aumentada** e o log mostra um aviso.
+5. Clique em **Iniciar Processamento** e acompanhe a lista.
 
 ## Arquivos gerados
 
@@ -88,6 +90,7 @@ As imagens originais não são alteradas.
 | Arquivo | Função |
 | --- | --- |
 | `server.js` | Servidor Express: seleção de pasta, processamento em lote e progresso (SSE) |
+| `redimensionar.js` | Resize proporcional do buffer após a PhotoRoom (`sharp`) |
 | `public/index.html` | Interface no navegador |
 | `Iniciar.command` | Atalho para subir o servidor no Mac |
 | `.env` | Chave da API (local, não vai para o Git) |
